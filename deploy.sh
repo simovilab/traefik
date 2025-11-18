@@ -1,0 +1,351 @@
+#!/bin/bash
+
+#####################################################################
+# Traefik Deployment Script
+# Quick deployment script for Traefik reverse proxy
+#####################################################################
+
+set -e
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Functions
+print_header() {
+    echo -e "\n${BLUE}===================================${NC}"
+    echo -e "${BLUE}$1${NC}"
+    echo -e "${BLUE}===================================${NC}\n"
+}
+
+print_success() {
+    echo -e "${GREEN}✓${NC} $1"
+}
+
+print_error() {
+    echo -e "${RED}✗${NC} $1"
+}
+
+print_warning() {
+    echo -e "${YELLOW}⚠${NC} $1"
+}
+
+print_info() {
+    echo -e "${BLUE}ℹ${NC} $1"
+}
+
+# Check prerequisites
+check_prerequisites() {
+    print_header "Checking Prerequisites"
+    
+    # Check Docker
+    if command -v docker &> /dev/null; then
+        print_success "Docker is installed: $(docker --version)"
+    else
+        print_error "Docker is not installed"
+        exit 1
+    fi
+    
+    # Check Docker Compose
+    if docker compose version &> /dev/null; then
+        print_success "Docker Compose is installed: $(docker compose version)"
+    elif command -v docker-compose &> /dev/null; then
+        print_success "Docker Compose is installed: $(docker-compose --version)"
+    else
+        print_error "Docker Compose is not installed"
+        exit 1
+    fi
+    
+    # Check if running as root (warn if yes)
+    if [ "$EUID" -eq 0 ]; then 
+        print_warning "Running as root. Consider using a non-root user."
+    fi
+}
+
+# Create network
+create_network() {
+    print_header "Creating Docker Network"
+    
+    if docker network inspect traefik_proxy &> /dev/null; then
+        print_warning "Network 'traefik_proxy' already exists"
+    else
+        docker network create traefik_proxy
+        print_success "Network 'traefik_proxy' created"
+    fi
+}
+
+# Setup files
+setup_files() {
+    print_header "Setting Up Configuration Files"
+    
+    # Create acme.json
+    if [ ! -f acme.json ]; then
+        touch acme.json
+        chmod 600 acme.json
+        print_success "Created acme.json with correct permissions"
+    else
+        chmod 600 acme.json
+        print_warning "acme.json already exists, updated permissions"
+    fi
+    
+    # Create logs directory
+    if [ ! -d logs ]; then
+        mkdir -p logs
+        print_success "Created logs directory"
+    else
+        print_warning "logs directory already exists"
+    fi
+    
+    # Create config directory
+    if [ ! -d config ]; then
+        mkdir -p config
+        print_success "Created config directory"
+    else
+        print_warning "config directory already exists"
+    fi
+    
+    # Check .env file
+    if [ ! -f .env ]; then
+        if [ -f .env.example ]; then
+            cp .env.example .env
+            print_warning ".env file created from .env.example"
+            print_warning "Please edit .env with your configuration before starting Traefik"
+            ENV_CONFIGURED=false
+        else
+            print_error ".env.example not found"
+            exit 1
+        fi
+    else
+        print_success ".env file exists"
+        ENV_CONFIGURED=true
+    fi
+}
+
+# Validate configuration
+validate_config() {
+    print_header "Validating Configuration"
+    
+    # Check if .env has been modified
+    if grep -q "example.com" .env || grep -q "xxxxxxxx" .env; then
+        print_error "Please configure .env file with your actual values"
+        print_info "Edit the following:"
+        print_info "  - TRAEFIK_DASHBOARD_DOMAIN"
+        print_info "  - TRAEFIK_DASHBOARD_AUTH (generate with htpasswd)"
+        print_info "  - Email in traefik.yml"
+        exit 1
+    fi
+    
+    # Check traefik.yml
+    if grep -q "admin@example.com" traefik.yml; then
+        print_warning "Don't forget to update email address in traefik.yml"
+    fi
+    
+    print_success "Configuration looks good"
+}
+
+# Start Traefik
+start_traefik() {
+    print_header "Starting Traefik"
+    
+    if docker compose ps | grep -q traefik; then
+        print_warning "Traefik is already running"
+        read -p "Do you want to restart? (y/N): " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            docker compose down
+            docker compose up -d
+            print_success "Traefik restarted"
+        fi
+    else
+        docker compose up -d
+        print_success "Traefik started"
+    fi
+}
+
+# Show status
+show_status() {
+    print_header "Traefik Status"
+    
+    docker compose ps
+    
+    echo -e "\n"
+    print_info "Dashboard URL: https://$(grep TRAEFIK_DASHBOARD_DOMAIN .env | cut -d '=' -f2)"
+    print_info "View logs: docker compose logs -f"
+    print_info "Stop Traefik: docker compose down"
+    
+    echo -e "\n"
+    print_success "Deployment complete!"
+}
+
+# Generate password
+generate_password() {
+    print_header "Generate Dashboard Password"
+    
+    if ! command -v htpasswd &> /dev/null; then
+        print_error "htpasswd not found"
+        print_info "Install with:"
+        print_info "  macOS: brew install httpd"
+        print_info "  Ubuntu/Debian: sudo apt-get install apache2-utils"
+        print_info "  CentOS/RHEL: sudo yum install httpd-tools"
+        exit 1
+    fi
+    
+    read -p "Enter username [admin]: " username
+    username=${username:-admin}
+    
+    read -s -p "Enter password: " password
+    echo
+    
+    if [ -z "$password" ]; then
+        print_error "Password cannot be empty"
+        exit 1
+    fi
+    
+    # Generate password hash
+    hash=$(htpasswd -nb "$username" "$password" | sed -e s/\\$/\\$\\$/g)
+    
+    echo -e "\n"
+    print_success "Generated password hash:"
+    echo -e "${GREEN}$hash${NC}"
+    echo -e "\n"
+    print_info "Add this to your .env file as TRAEFIK_DASHBOARD_AUTH"
+}
+
+# Main menu
+show_menu() {
+    echo -e "\n${BLUE}╔════════════════════════════════════════╗${NC}"
+    echo -e "${BLUE}║     Traefik Deployment Script          ║${NC}"
+    echo -e "${BLUE}╚════════════════════════════════════════╝${NC}\n"
+    echo "1) Full deployment (setup + start)"
+    echo "2) Setup only (no start)"
+    echo "3) Start Traefik"
+    echo "4) Stop Traefik"
+    echo "5) Restart Traefik"
+    echo "6) View logs"
+    echo "7) Generate password"
+    echo "8) Check status"
+    echo "9) Exit"
+    echo ""
+}
+
+# Handle menu choice
+handle_choice() {
+    case $1 in
+        1)
+            check_prerequisites
+            create_network
+            setup_files
+            if [ "$ENV_CONFIGURED" = true ]; then
+                validate_config
+                start_traefik
+                show_status
+            else
+                print_warning "Please configure .env file first, then run option 3 to start"
+            fi
+            ;;
+        2)
+            check_prerequisites
+            create_network
+            setup_files
+            print_info "Setup complete. Configure .env and run option 3 to start"
+            ;;
+        3)
+            validate_config
+            start_traefik
+            show_status
+            ;;
+        4)
+            docker compose down
+            print_success "Traefik stopped"
+            ;;
+        5)
+            docker compose restart
+            print_success "Traefik restarted"
+            ;;
+        6)
+            docker compose logs -f
+            ;;
+        7)
+            generate_password
+            ;;
+        8)
+            docker compose ps
+            ;;
+        9)
+            exit 0
+            ;;
+        *)
+            print_error "Invalid option"
+            ;;
+    esac
+}
+
+# Main script
+main() {
+    # If arguments provided, run directly
+    if [ $# -gt 0 ]; then
+        case "$1" in
+            --help|-h)
+                echo "Usage: $0 [option]"
+                echo ""
+                echo "Options:"
+                echo "  deploy      Full deployment"
+                echo "  setup       Setup only"
+                echo "  start       Start Traefik"
+                echo "  stop        Stop Traefik"
+                echo "  restart     Restart Traefik"
+                echo "  logs        View logs"
+                echo "  password    Generate password"
+                echo "  status      Check status"
+                echo ""
+                echo "Run without arguments for interactive menu"
+                exit 0
+                ;;
+            deploy)
+                handle_choice 1
+                ;;
+            setup)
+                handle_choice 2
+                ;;
+            start)
+                handle_choice 3
+                ;;
+            stop)
+                handle_choice 4
+                ;;
+            restart)
+                handle_choice 5
+                ;;
+            logs)
+                handle_choice 6
+                ;;
+            password)
+                handle_choice 7
+                ;;
+            status)
+                handle_choice 8
+                ;;
+            *)
+                print_error "Unknown option: $1"
+                echo "Use --help for usage information"
+                exit 1
+                ;;
+        esac
+    else
+        # Interactive menu
+        while true; do
+            show_menu
+            read -p "Select an option: " choice
+            handle_choice $choice
+            
+            if [ "$choice" != "6" ] && [ "$choice" != "9" ]; then
+                echo ""
+                read -p "Press Enter to continue..."
+            fi
+        done
+    fi
+}
+
+main "$@"

@@ -1,0 +1,127 @@
+# Example Service Configuration for Traefik
+# Copy this file to your application directory and customize
+# Compatible with Traefik v3.6+
+
+services:
+  # Example 1: Simple web application
+  webapp:
+    image: nginx:alpine
+    container_name: webapp
+    restart: unless-stopped
+    networks:
+      - traefik_proxy
+    labels:
+      # Enable Traefik
+      - "traefik.enable=true"
+      
+      # HTTP Router
+      - "traefik.http.routers.webapp.rule=Host(`app.yourdomain.com`)"
+      - "traefik.http.routers.webapp.entrypoints=websecure"
+      - "traefik.http.routers.webapp.tls=true"
+      - "traefik.http.routers.webapp.tls.certresolver=letsencrypt"
+      
+      # Service (specify port if not 80)
+      - "traefik.http.services.webapp.loadbalancer.server.port=80"
+      
+      # Optional: Apply middlewares
+      - "traefik.http.routers.webapp.middlewares=security-headers@file,rate-limit@file"
+
+  # Example 2: API service with path prefix
+  api:
+    image: your-api:latest
+    container_name: api
+    restart: unless-stopped
+    networks:
+      - traefik_proxy
+    labels:
+      - "traefik.enable=true"
+      
+      # Route with path
+      - "traefik.http.routers.api.rule=Host(`yourdomain.com`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.api.entrypoints=websecure"
+      - "traefik.http.routers.api.tls=true"
+      - "traefik.http.routers.api.tls.certresolver=letsencrypt"
+      
+      # Strip /api prefix before forwarding
+      - "traefik.http.routers.api.middlewares=api-stripprefix"
+      - "traefik.http.middlewares.api-stripprefix.stripprefix.prefixes=/api"
+      
+      - "traefik.http.services.api.loadbalancer.server.port=3000"
+
+  # Example 3: Multiple domains
+  multiapp:
+    image: your-app:latest
+    container_name: multiapp
+    restart: unless-stopped
+    networks:
+      - traefik_proxy
+    labels:
+      - "traefik.enable=true"
+      
+      # Multiple domains
+      - "traefik.http.routers.multiapp.rule=Host(`domain1.com`) || Host(`domain2.com`) || Host(`www.domain1.com`)"
+      - "traefik.http.routers.multiapp.entrypoints=websecure"
+      - "traefik.http.routers.multiapp.tls=true"
+      - "traefik.http.routers.multiapp.tls.certresolver=letsencrypt"
+      - "traefik.http.services.multiapp.loadbalancer.server.port=8080"
+
+  # Example 4: Service with authentication
+  protected:
+    image: your-protected-app:latest
+    container_name: protected
+    restart: unless-stopped
+    networks:
+      - traefik_proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.protected.rule=Host(`secure.yourdomain.com`)"
+      - "traefik.http.routers.protected.entrypoints=websecure"
+      - "traefik.http.routers.protected.tls=true"
+      - "traefik.http.routers.protected.tls.certresolver=letsencrypt"
+      
+      # Basic Auth (generate with: htpasswd -nb user password)
+      - "traefik.http.routers.protected.middlewares=protected-auth"
+      - "traefik.http.middlewares.protected-auth.basicauth.users=user:$$apr1$$xxxxxxxx$$xxxxxxxxxxxxxxxxxxxxxx"
+      
+      - "traefik.http.services.protected.loadbalancer.server.port=80"
+
+  # Example 5: Service with sticky sessions
+  sticky-app:
+    image: your-app:latest
+    container_name: sticky-app
+    restart: unless-stopped
+    networks:
+      - traefik_proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.sticky.rule=Host(`sticky.yourdomain.com`)"
+      - "traefik.http.routers.sticky.entrypoints=websecure"
+      - "traefik.http.routers.sticky.tls=true"
+      - "traefik.http.routers.sticky.tls.certresolver=letsencrypt"
+      
+      # Sticky sessions
+      - "traefik.http.services.sticky.loadbalancer.sticky.cookie=true"
+      - "traefik.http.services.sticky.loadbalancer.sticky.cookie.name=sticky_session"
+      - "traefik.http.services.sticky.loadbalancer.sticky.cookie.secure=true"
+      - "traefik.http.services.sticky.loadbalancer.sticky.cookie.httpOnly=true"
+      
+      - "traefik.http.services.sticky.loadbalancer.server.port=8080"
+
+  # Example 6: WebSocket application
+  websocket:
+    image: your-websocket-app:latest
+    container_name: websocket
+    restart: unless-stopped
+    networks:
+      - traefik_proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.websocket.rule=Host(`ws.yourdomain.com`)"
+      - "traefik.http.routers.websocket.entrypoints=websecure"
+      - "traefik.http.routers.websocket.tls=true"
+      - "traefik.http.routers.websocket.tls.certresolver=letsencrypt"
+      - "traefik.http.services.websocket.loadbalancer.server.port=8080"
+
+networks:
+  traefik_proxy:
+    external: true

@@ -1,0 +1,67 @@
+################################################################
+# Middleware Configuration
+################################################################
+
+http:
+  middlewares:
+    # Security Headers
+    security-headers:
+      headers:
+        frameDeny: true
+        sslRedirect: true
+        browserXssFilter: true
+        contentTypeNosniff: true
+        forceSTSHeader: true
+        stsIncludeSubdomains: true
+        stsPreload: true
+        stsSeconds: 31536000
+        customFrameOptionsValue: "SAMEORIGIN"
+        customResponseHeaders:
+          X-Robots-Tag: "none,noarchive,nosnippet,notranslate,noimageindex"
+          Server: ""
+
+    # Rate Limiting
+    rate-limit:
+      rateLimit:
+        average: 100
+        burst: 50
+        period: 1m
+
+    # Compression
+    compression:
+      compress: true
+
+    # IP Whitelist Example
+    # ip-whitelist:
+    #   ipWhiteList:
+    #     sourceRange:
+    #       - "127.0.0.1/32"
+    #       - "192.168.1.0/24"
+
+    # CORS Headers Example
+    # cors-headers:
+    #   headers:
+    #     accessControlAllowMethods:
+    #       - GET
+    #       - OPTIONS
+    #       - PUT
+    #       - POST
+    #       - DELETE
+    #     accessControlAllowOriginList:
+    #       - https://example.com
+    #     accessControlMaxAge: 100
+    #     addVaryHeader: true
+
+    # Redirect to WWW
+    # redirect-to-www:
+    #   redirectRegex:
+    #     regex: "^https://(?:www\\.)?(.+)"
+    #     replacement: "https://www.${1}"
+    #     permanent: true
+
+    # Strip WWW
+    # strip-www:
+    #   redirectRegex:
+    #     regex: "^https://www\\.(.+)"
+    #     replacement: "https://${1}"
+    #     permanent: true

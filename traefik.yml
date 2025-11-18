@@ -1,0 +1,104 @@
+################################################################
+# Global Configuration
+################################################################
+global:
+  checkNewVersion: true
+  sendAnonymousUsage: false
+
+################################################################
+# API and Dashboard
+################################################################
+api:
+  dashboard: true
+  insecure: false
+
+################################################################
+# Entry Points
+################################################################
+entryPoints:
+  web:
+    address: ":80"
+    http:
+      redirections:
+        entryPoint:
+          to: websecure
+          scheme: https
+          permanent: true
+
+  websecure:
+    address: ":443"
+    http:
+      tls:
+        certResolver: letsencrypt
+        domains:
+          - main: example.com
+            sans:
+              - "*.example.com"
+
+################################################################
+# Certificates Resolvers
+################################################################
+certificatesResolvers:
+  letsencrypt:
+    acme:
+      email: admin@example.com
+      storage: /acme.json
+      caServer: https://acme-v02.api.letsencrypt.org/directory
+      # Uncomment for staging/testing
+      # caServer: https://acme-staging-v02.api.letsencrypt.org/directory
+      
+      # HTTP Challenge (simple but requires port 80)
+      httpChallenge:
+        entryPoint: web
+      
+      # DNS Challenge (recommended for wildcard certificates)
+      # Uncomment and configure for your DNS provider
+      # dnsChallenge:
+      #   provider: cloudflare
+      #   delayBeforeCheck: 30
+      #   resolvers:
+      #     - "1.1.1.1:53"
+      #     - "8.8.8.8:53"
+
+  letsencrypt-staging:
+    acme:
+      email: admin@example.com
+      storage: /acme-staging.json
+      caServer: https://acme-staging-v02.api.letsencrypt.org/directory
+      httpChallenge:
+        entryPoint: web
+
+################################################################
+# Docker Provider
+################################################################
+providers:
+  docker:
+    endpoint: "unix:///var/run/docker.sock"
+    exposedByDefault: false
+    network: traefik_proxy
+    watch: true
+
+  file:
+    directory: /config
+    watch: true
+
+################################################################
+# Logging
+################################################################
+log:
+  level: INFO
+  filePath: /logs/traefik.log
+  format: json
+
+accessLog:
+  filePath: /logs/access.log
+  format: json
+
+################################################################
+# Metrics (Optional)
+################################################################
+# metrics:
+#   prometheus:
+#     addEntryPointsLabels: true
+#     addServicesLabels: true
+#     entryPoint: metrics

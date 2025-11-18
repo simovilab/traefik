@@ -24,8 +24,24 @@ profile.cov
 go.work
 go.work.sum
 
-# env file
+# Environment variables
 .env
+
+# SSL Certificates
+acme.json
+acme-staging.json
+
+# Logs
+logs/
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Backup files
+*.bak
+*.backup
 
 # Editor/IDE
 # .idea/
