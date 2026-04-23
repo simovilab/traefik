@@ -8,7 +8,7 @@ Use this checklist when deploying Traefik to a new server.
 - [ ] Docker installed (version 20.10+)
 - [ ] Docker Compose installed (version 2.0+)
 - [ ] Server has public IP address
-- [ ] Ports 80 and 443 are open in firewall
+- [ ] Ports 80 and 443 are open in firewall (port 8080 is NOT required)
 - [ ] SSH access configured
 - [ ] Non-root user with sudo access (recommended)
 
@@ -46,23 +46,24 @@ Use this checklist when deploying Traefik to a new server.
 ## Configuration
 
 ### Environment Variables (.env)
-- [ ] `TRAEFIK_DASHBOARD_DOMAIN` set to your domain
+- [ ] `TRAEFIK_DASHBOARD_DOMAIN` set to your real dashboard domain
 - [ ] `TRAEFIK_DASHBOARD_AUTH` generated and set
   - Command: `htpasswd -nb admin password | sed -e s/\\$/\\$\\$/g`
   - Or use: `./deploy.sh password`
+- [ ] `ACME_EMAIL` set to a real, reachable email (NOT `example.com`)
 - [ ] `CERT_RESOLVER` confirmed (default: `letsencrypt`)
-- [ ] DNS provider credentials set (if using DNS challenge)
+- [ ] DNS provider credentials set (only if using DNS challenge)
 
 ### Traefik Configuration (traefik.yml)
-- [ ] Email address updated in `certificatesResolvers.letsencrypt.acme.email`
-- [ ] Domain names updated in `entryPoints.websecure.http.tls.domains` (if using DNS challenge)
 - [ ] Log level appropriate (INFO for production, DEBUG for troubleshooting)
-- [ ] Certificate challenge method chosen (HTTP or DNS)
-- [ ] DNS challenge provider configured (if applicable)
+- [ ] Certificate challenge method chosen (HTTP-01 default, or DNS for wildcards)
+- [ ] DNS challenge provider configured (only if applicable)
+- [ ] `tls.domains` block re-added with wildcards (only if using DNS challenge)
 
 ### Docker Compose (docker-compose.yml)
-- [ ] Traefik version specified (default: v3.6)
-- [ ] Ports mapped correctly (80, 443, 8080)
+- [ ] Traefik version pinned (current default: v3.6.2)
+- [ ] Ports mapped correctly (80, 443)
+- [ ] Healthcheck present
 - [ ] Volumes mounted correctly
 - [ ] Network set to `traefik_proxy`
 - [ ] Environment variables referenced correctly

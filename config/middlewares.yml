@@ -1,21 +1,25 @@
 ################################################################
-# Middleware Configuration
+# Middleware Configuration (Traefik v3)
 ################################################################
 
 http:
   middlewares:
     # Security Headers
+    # Notes:
+    #   - sslRedirect / browserXssFilter / frameDeny were removed or
+    #     deprecated in v3. HTTPS redirect is handled by the web
+    #     entrypoint redirection in traefik.yml.
+    #   - Only enable stsPreload after submitting your domain to
+    #     https://hstspreload.org/ — it is hard to undo.
     security-headers:
       headers:
-        frameDeny: true
-        sslRedirect: true
-        browserXssFilter: true
         contentTypeNosniff: true
+        customFrameOptionsValue: "SAMEORIGIN"
+        referrerPolicy: "strict-origin-when-cross-origin"
         forceSTSHeader: true
         stsIncludeSubdomains: true
-        stsPreload: true
+        stsPreload: false
         stsSeconds: 31536000
-        customFrameOptionsValue: "SAMEORIGIN"
         customResponseHeaders:
           X-Robots-Tag: "none,noarchive,nosnippet,notranslate,noimageindex"
           Server: ""
@@ -31,9 +35,9 @@ http:
     compression:
       compress: true
 
-    # IP Whitelist Example
-    # ip-whitelist:
-    #   ipWhiteList:
+    # IP Allow List Example (v3: ipAllowList; v2 ipWhiteList is deprecated)
+    # ip-allowlist:
+    #   ipAllowList:
     #     sourceRange:
     #       - "127.0.0.1/32"
     #       - "192.168.1.0/24"

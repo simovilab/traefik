@@ -126,22 +126,54 @@ setup_files() {
 # Validate configuration
 validate_config() {
     print_header "Validating Configuration"
-    
-    # Check if .env has been modified
-    if grep -q "example.com" .env || grep -q "xxxxxxxx" .env; then
-        print_error "Please configure .env file with your actual values"
-        print_info "Edit the following:"
-        print_info "  - TRAEFIK_DASHBOARD_DOMAIN"
-        print_info "  - TRAEFIK_DASHBOARD_AUTH (generate with htpasswd)"
-        print_info "  - Email in traefik.yml"
+
+    if [ ! -f .env ]; then
+        print_error ".env file not found. Run: ./deploy.sh setup"
         exit 1
     fi
-    
-    # Check traefik.yml
-    if grep -q "admin@example.com" traefik.yml; then
-        print_warning "Don't forget to update email address in traefik.yml"
+
+    # Load .env safely for validation.
+    # shellcheck disable=SC1091
+    set -a
+    . ./.env
+    set +a
+
+    local errors=0
+
+    if [ -z "${TRAEFIK_DASHBOARD_DOMAIN:-}" ] || \
+       [[ "$TRAEFIK_DASHBOARD_DOMAIN" == *example.com ]]; then
+        print_error "TRAEFIK_DASHBOARD_DOMAIN is unset or still uses example.com"
+        errors=$((errors+1))
     fi
-    
+
+    if [ -z "${TRAEFIK_DASHBOARD_AUTH:-}" ] || \
+       [[ "$TRAEFIK_DASHBOARD_AUTH" == *xxxxxxxx* ]]; then
+        print_error "TRAEFIK_DASHBOARD_AUTH is unset or still contains placeholder"
+        print_info "  Generate with: ./deploy.sh password"
+        errors=$((errors+1))
+    fi
+
+    # ACME_EMAIL is now authoritative (injected into Traefik via
+    # TRAEFIK_CERTIFICATESRESOLVERS_LETSENCRYPT_ACME_EMAIL). Let's Encrypt
+    # rejects example.com, so fail hard here.
+    if [ -z "${ACME_EMAIL:-}" ] || \
+       [[ "$ACME_EMAIL" == *@example.com ]] || \
+       [[ "$ACME_EMAIL" == *@yourdomain.com ]]; then
+        print_error "ACME_EMAIL is unset or uses a forbidden placeholder domain"
+        print_info "  Let's Encrypt rejects example.com / yourdomain.com addresses"
+        errors=$((errors+1))
+    fi
+
+    if [ "${CERT_RESOLVER:-letsencrypt}" != "letsencrypt" ]; then
+        print_warning "CERT_RESOLVER is set to '$CERT_RESOLVER' — make sure it"
+        print_warning "matches a resolver defined in traefik.yml"
+    fi
+
+    if [ "$errors" -gt 0 ]; then
+        print_error "Configuration invalid ($errors error(s)). Aborting."
+        exit 1
+    fi
+
     print_success "Configuration looks good"
 }
 
@@ -167,14 +199,20 @@ start_traefik() {
 # Show status
 show_status() {
     print_header "Traefik Status"
-    
+
     docker compose ps
-    
+
     echo -e "\n"
-    print_info "Dashboard URL: https://$(grep TRAEFIK_DASHBOARD_DOMAIN .env | cut -d '=' -f2)"
+    if [ -f .env ]; then
+        local dashboard
+        dashboard=$(grep '^TRAEFIK_DASHBOARD_DOMAIN=' .env | cut -d '=' -f2-)
+        if [ -n "$dashboard" ]; then
+            print_info "Dashboard URL: https://$dashboard"
+        fi
+    fi
     print_info "View logs: docker compose logs -f"
     print_info "Stop Traefik: docker compose down"
-    
+
     echo -e "\n"
     print_success "Deployment complete!"
 }

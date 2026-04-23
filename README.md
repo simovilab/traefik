@@ -35,9 +35,9 @@ traefik/
 
 ## Prerequisites
 
-- Docker and Docker Compose installed
+- Docker and Docker Compose v2 installed
 - Domain name(s) pointing to your server(s)
-- Ports 80 and 443 available
+- Ports 80 and 443 available (inbound)
 - (Optional) DNS provider API credentials for wildcard certificates
 
 ## Quick Start
@@ -75,11 +75,12 @@ echo $(htpasswd -nb admin yourpassword) | sed -e s/\\$/\\$\\$/g
 # Paste the output in .env as TRAEFIK_DASHBOARD_AUTH value
 ```
 
-### 3. Update traefik.yml
+### 3. Set the ACME email
 
-Edit `traefik.yml` and update:
-- Email address in `certificatesResolvers.letsencrypt.acme.email`
-- Domain names in `entryPoints.websecure.http.tls.domains`
+Set `ACME_EMAIL` in `.env` — it is injected into Traefik via the
+`TRAEFIK_CERTIFICATESRESOLVERS_LETSENCRYPT_ACME_EMAIL` environment
+variable, so you do not need to edit `traefik.yml`. It must be a real,
+reachable address (Let's Encrypt rejects `example.com`).
 
 ### 4. Launch Traefik
 
@@ -113,8 +114,6 @@ To route traffic to your containerized applications, add them to the `traefik_pr
 ### Example: Web Application
 
 ```yaml
-version: '3.8'
-
 services:
   webapp:
     image: your-app:latest
@@ -266,13 +265,14 @@ htpasswd -nb admin newpassword | sed -e s/\\$/\\$\\$/g
 ./deploy.sh password
 ```
 
-### IP Whitelisting
+### IP Allow List
 
-Uncomment and configure in `config/middlewares.yml`:
+Uncomment and configure in `config/middlewares.yml` (Traefik v3 uses
+`ipAllowList`; the v2 `ipWhiteList` name is deprecated):
 
 ```yaml
-ip-whitelist:
-  ipWhiteList:
+ip-allowlist:
+  ipAllowList:
     sourceRange:
       - "YOUR.IP.ADDRESS/32"
       - "10.0.0.0/8"
@@ -282,7 +282,7 @@ Apply to services:
 
 ```yaml
 labels:
-  - "traefik.http.routers.myapp.middlewares=ip-whitelist@file"
+  - "traefik.http.routers.myapp.middlewares=ip-allowlist@file"
 ```
 
 ### Security Headers
@@ -340,9 +340,10 @@ docker compose up -d
 ### Dashboard Not Accessible
 
 - Verify DNS points to server
-- Check firewall allows ports 80, 443, 8080
+- Check firewall allows ports 80 and 443 (the dashboard is served on
+  HTTPS via `api@internal`; port 8080 is not used)
 - Verify `TRAEFIK_DASHBOARD_DOMAIN` in `.env`
-- Check authentication string format
+- Check authentication string format (doubled `$$`)
 
 ### Service Not Routing
 
@@ -387,7 +388,7 @@ docker compose exec traefik traefik version
 ```bash
 # Backup certificates and config
 tar -czf traefik-backup-$(date +%Y%m%d).tar.gz \
-  acme.json .env traefik.yml config/
+  acme.json .env traefik.yml docker-compose.yml config/
 ```
 
 ### Restore

@@ -2,15 +2,20 @@
 # Global Configuration
 ################################################################
 global:
-  checkNewVersion: true
+  # Disable version check to keep logs clean in production.
+  # Set to true in dev if you want Traefik to phone home for updates.
+  checkNewVersion: false
   sendAnonymousUsage: false
 
 ################################################################
-# API and Dashboard
+# API, Dashboard & Health
 ################################################################
 api:
   dashboard: true
   insecure: false
+
+# Enables the /ping endpoint used by the container healthcheck.
+ping: {}
 
 ################################################################
 # Entry Points
@@ -27,32 +32,36 @@ entryPoints:
 
   websecure:
     address: ":443"
-    http:
-      tls:
-        certResolver: letsencrypt
-        domains:
-          - main: example.com
-            sans:
-              - "*.example.com"
+    # NOTE: default certResolver is set per-router via labels or via a
+    # dynamic TLS options file. We avoid hardcoding wildcard domains here
+    # because the default challenge is HTTP-01, which cannot issue
+    # wildcard certificates. Enable DNS challenge + re-add `tls.domains`
+    # only if you need wildcards.
 
 ################################################################
 # Certificates Resolvers
+#
+# The `email` field is intentionally omitted here and provided via the
+# TRAEFIK_CERTIFICATESRESOLVERS_LETSENCRYPT_ACME_EMAIL env var
+# (see docker-compose.yml + .env.example).
 ################################################################
 certificatesResolvers:
   letsencrypt:
     acme:
-      email: admin@example.com
       storage: /acme.json
       caServer: https://acme-v02.api.letsencrypt.org/directory
-      # Uncomment for staging/testing
+      # For testing, point at the staging CA instead of defining a
+      # second resolver (which would require another mounted storage
+      # file):
       # caServer: https://acme-staging-v02.api.letsencrypt.org/directory
-      
-      # HTTP Challenge (simple but requires port 80)
+
+      # HTTP Challenge (simple; requires port 80 reachable).
       httpChallenge:
         entryPoint: web
-      
-      # DNS Challenge (recommended for wildcard certificates)
-      # Uncomment and configure for your DNS provider
+
+      # DNS Challenge (enables wildcard certificates).
+      # Uncomment and configure for your DNS provider, then remove
+      # the httpChallenge block above.
       # dnsChallenge:
       #   provider: cloudflare
       #   delayBeforeCheck: 30
@@ -60,16 +69,8 @@ certificatesResolvers:
       #     - "1.1.1.1:53"
       #     - "8.8.8.8:53"
 
-  letsencrypt-staging:
-    acme:
-      email: admin@example.com
-      storage: /acme-staging.json
-      caServer: https://acme-staging-v02.api.letsencrypt.org/directory
-      httpChallenge:
-        entryPoint: web
-
 ################################################################
-# Docker Provider
+# Providers
 ################################################################
 providers:
   docker:
@@ -93,6 +94,8 @@ log:
 accessLog:
   filePath: /logs/access.log
   format: json
+  # Keep access logs bounded; rotate externally (e.g. logrotate).
+  bufferingSize: 100
 
 ################################################################
 # Metrics (Optional)

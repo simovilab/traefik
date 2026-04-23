@@ -1,6 +1,7 @@
 services:
   traefik:
-    image: traefik:v3.6
+    # Pin a specific patch version in production; bump deliberately.
+    image: traefik:v3.6.2
     container_name: traefik
     restart: unless-stopped
     security_opt:
@@ -8,10 +9,12 @@ services:
     networks:
       - traefik_proxy
     ports:
-      - "80:80"       # HTTP
-      - "443:443"     # HTTPS
-      - "8080:8080"   # Dashboard (can be changed via .env)
+      - "80:80"    # HTTP (ACME HTTP-01 challenge + redirect to HTTPS)
+      - "443:443"  # HTTPS
     environment:
+      # ACME account email (overrides static config via TRAEFIK_* env var).
+      - TRAEFIK_CERTIFICATESRESOLVERS_LETSENCRYPT_ACME_EMAIL=${ACME_EMAIL}
+      # DNS provider credentials (only needed for DNS challenge).
       - CF_API_EMAIL=${CF_API_EMAIL}
       - CF_DNS_API_TOKEN=${CF_DNS_API_TOKEN}
     volumes:
@@ -21,25 +24,29 @@ services:
       - ./acme.json:/acme.json
       - ./config:/config:ro
       - ./logs:/logs
+    healthcheck:
+      test: ["CMD", "traefik", "healthcheck", "--ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     labels:
       - "traefik.enable=true"
-      
-      # Dashboard
+
+      # Dashboard router (served on HTTPS via api@internal).
       - "traefik.http.routers.traefik-dashboard.rule=Host(`${TRAEFIK_DASHBOARD_DOMAIN}`)"
       - "traefik.http.routers.traefik-dashboard.entrypoints=websecure"
       - "traefik.http.routers.traefik-dashboard.tls=true"
       - "traefik.http.routers.traefik-dashboard.tls.certresolver=${CERT_RESOLVER}"
       - "traefik.http.routers.traefik-dashboard.service=api@internal"
-      - "traefik.http.routers.traefik-dashboard.middlewares=dashboard-auth"
-      
-      # Dashboard authentication
+      - "traefik.http.routers.traefik-dashboard.middlewares=dashboard-auth,security-headers@file"
+
+      # Dashboard authentication (basic auth).
+      # Consider also chaining ip-allowlist@file for defence in depth.
       - "traefik.http.middlewares.dashboard-auth.basicauth.users=${TRAEFIK_DASHBOARD_AUTH}"
-      
-      # Global redirect to HTTPS
-      - "traefik.http.routers.http-catchall.rule=hostregexp(`{host:.+}`)"
-      - "traefik.http.routers.http-catchall.entrypoints=web"
-      - "traefik.http.routers.http-catchall.middlewares=redirect-to-https"
-      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+
+      # NOTE: HTTP->HTTPS redirect is configured globally on the `web`
+      # entrypoint in traefik.yml, so no catch-all router is needed here.
 
 networks:
   traefik_proxy:

@@ -12,7 +12,9 @@ Complete overview of all files in this Traefik reverse proxy setup.
 ### traefik.yml
 - **Purpose**: Traefik static configuration
 - **Contains**: Entry points, certificate resolvers, providers, logging
-- **Edit**: Before first deployment (email, domains)
+- **Edit**: Usually unchanged. The ACME email is supplied from `.env`
+  via `TRAEFIK_CERTIFICATESRESOLVERS_LETSENCRYPT_ACME_EMAIL`, so there
+  is nothing to edit here unless you switch challenge type.
 
 ### acme.json
 - **Purpose**: SSL certificate storage
@@ -107,9 +109,9 @@ docker-compose   → 644 (rw-r--r--)
 ## Customization Guide
 
 ### For Initial Deployment
-1. Edit `.env` (required)
-2. Edit `traefik.yml` email address (required)
-3. Optionally edit `config/middlewares.yml`
+1. Edit `.env` (required — set `TRAEFIK_DASHBOARD_DOMAIN`,
+   `TRAEFIK_DASHBOARD_AUTH`, `ACME_EMAIL`)
+2. Optionally edit `config/middlewares.yml`
 
 ### For Each New Service
 1. Create service docker-compose.yml
