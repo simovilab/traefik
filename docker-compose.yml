@@ -18,9 +18,9 @@ services:
     environment:
       # ACME account email (overrides static config via TRAEFIK_* env var).
       - TRAEFIK_CERTIFICATESRESOLVERS_LETSENCRYPT_ACME_EMAIL=${ACME_EMAIL}
-      # DNS provider credentials (only needed for DNS challenge).
-      - CF_API_EMAIL=${CF_API_EMAIL}
-      - CF_DNS_API_TOKEN=${CF_DNS_API_TOKEN}
+      # DNS provider credentials (only uncomment when using DNS challenge).
+      # - CF_API_EMAIL=${CF_API_EMAIL}
+      # - CF_DNS_API_TOKEN=${CF_DNS_API_TOKEN}
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
