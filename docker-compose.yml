@@ -8,6 +8,10 @@ services:
       - no-new-privileges:true
     networks:
       - traefik_proxy
+    # Allows routing to services on the host (systemd, etc.) via
+    # http://host.docker.internal:<port> from the file provider.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "80:80"    # HTTP (ACME HTTP-01 challenge + redirect to HTTPS)
       - "443:443"  # HTTPS

@@ -1,0 +1,30 @@
+################################################################
+# Dynamic services/routers served by Traefik's file provider.
+#
+# Use this file for hosts whose backend is NOT a Docker container
+# labelled directly (e.g. systemd services on the host, legacy
+# applications, external upstreams).
+################################################################
+
+http:
+  routers:
+    araiza:
+      rule: "Host(`administracionesaraiza.com.mx`)"
+      entryPoints:
+        - websecure
+      service: araiza
+      middlewares:
+        - security-headers@file
+        - compression@file
+      tls:
+        certResolver: letsencrypt
+
+  services:
+    araiza:
+      loadBalancer:
+        passHostHeader: true
+        servers:
+          # Reaches the Nuxt app (araiza.service) running on the host.
+          # `host.docker.internal` is mapped via `extra_hosts` in
+          # docker-compose.yml.
+          - url: "http://host.docker.internal:3000"
