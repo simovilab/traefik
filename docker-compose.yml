@@ -13,8 +13,9 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
-      - "80:80"    # HTTP (ACME HTTP-01 challenge + redirect to HTTPS)
-      - "443:443"  # HTTPS
+      - "80:80" # HTTP (ACME HTTP-01 challenge + redirect to HTTPS)
+      - "443:443" # HTTPS
+      - "8883:8883" # MQTT over TLS
     environment:
       # ACME account email (overrides static config via TRAEFIK_* env var).
       - TRAEFIK_CERTIFICATESRESOLVERS_LETSENCRYPT_ACME_EMAIL=${ACME_EMAIL}
@@ -34,6 +35,11 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.50"
     labels:
       - "traefik.enable=true"
 
@@ -43,7 +49,7 @@ services:
       - "traefik.http.routers.traefik-dashboard.tls=true"
       - "traefik.http.routers.traefik-dashboard.tls.certresolver=${CERT_RESOLVER}"
       - "traefik.http.routers.traefik-dashboard.service=api@internal"
-      - "traefik.http.routers.traefik-dashboard.middlewares=dashboard-auth,security-headers@file"
+      - "traefik.http.routers.traefik-dashboard.middlewares=dashboard-auth,ip-allowlist@file,security-headers@file"
 
       # Dashboard authentication (basic auth).
       # Consider also chaining ip-allowlist@file for defence in depth.

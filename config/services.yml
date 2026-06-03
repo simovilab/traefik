@@ -4,27 +4,41 @@
 # Use this file for hosts whose backend is NOT a Docker container
 # labelled directly (e.g. systemd services on the host, legacy
 # applications, external upstreams).
+#
+# IMPORTANT — server-specific file:
+#   Add ONLY the services that run on THIS server (Databús or Infobús,
+#   not both). Each project lives on its own server with its own Traefik
+#   instance. Entries for the wrong server will trigger failing ACME
+#   HTTP-01 challenges and consume Let's Encrypt rate-limit quota.
 ################################################################
 
 http:
-  routers:
-    araiza:
-      rule: "Host(`administracionesaraiza.com.mx`)"
-      entryPoints:
-        - websecure
-      service: araiza
-      middlewares:
-        - security-headers@file
-        - compression@file
-      tls:
-        certResolver: letsencrypt
+  routers: {}
+  services: {}
 
-  services:
-    araiza:
-      loadBalancer:
-        passHostHeader: true
-        servers:
-          # Reaches the Nuxt app (araiza.service) running on the host.
-          # `host.docker.internal` is mapped via `extra_hosts` in
-          # docker-compose.yml.
-          - url: "http://host.docker.internal:3000"
+  # Uncomment and adapt the block below for each host service on this server.
+  # routers:
+  #   my-service:
+  #     rule: "Host(`my-service.example.com`)"
+  #     entryPoints:
+  #       - websecure
+  #     service: my-service
+  #     middlewares:
+  #       - security-headers@file
+  #       - cors-headers@file     # remove if this service is not a public API
+  #       - rate-limit@file
+  #       - compression@file
+  #     tls:
+  #       certResolver: letsencrypt
+  #
+  # services:
+  #   my-service:
+  #     loadBalancer:
+  #       passHostHeader: true
+  #       healthCheck:
+  #         path: /health
+  #         interval: 10s
+  #         timeout: 3s
+  #       servers:
+  #         # host.docker.internal is mapped via extra_hosts in docker-compose.yml.
+  #         - url: "http://host.docker.internal:3000"

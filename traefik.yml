@@ -38,6 +38,11 @@ entryPoints:
     # wildcard certificates. Enable DNS challenge + re-add `tls.domains`
     # only if you need wildcards.
 
+  # MQTT over TLS — Traefik terminates TLS and forwards plain MQTT to the
+  # backend broker. Routers are defined via Docker labels in compose.prod.yml.
+  mqtt:
+    address: ":8883"
+
 ################################################################
 # Certificates Resolvers
 #
@@ -98,10 +103,12 @@ accessLog:
   bufferingSize: 100
 
 ################################################################
-# Metrics (Optional)
+# Metrics
 ################################################################
-# metrics:
-#   prometheus:
-#     addEntryPointsLabels: true
-#     addServicesLabels: true
-#     entryPoint: metrics
+metrics:
+  prometheus:
+    addEntryPointsLabels: true
+    addServicesLabels: true
+    addRoutersLabels: true
+    # Exposed on the default internal entrypoint; scrape via:
+    #   docker exec traefik wget -qO- http://localhost:8080/metrics

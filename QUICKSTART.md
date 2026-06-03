@@ -12,6 +12,7 @@ Get Traefik up and running in 5 minutes.
 ## Installation Steps
 
 ### 1. Clone or Copy Files
+
 ```bash
 # If using git
 git clone <your-repo> /opt/traefik
@@ -21,11 +22,13 @@ cd /opt/traefik
 ```
 
 ### 2. Run Setup Script
+
 ```bash
 ./deploy.sh setup
 ```
 
 This will:
+
 - Create the `traefik_proxy` Docker network
 - Create `acme.json` with correct permissions
 - Create logs directory
@@ -34,16 +37,19 @@ This will:
 ### 3. Configure Your Settings
 
 Edit `.env`:
+
 ```bash
 nano .env
 ```
 
 **Required changes:**
+
 1. Set `TRAEFIK_DASHBOARD_DOMAIN` to your dashboard domain
 2. Generate password hash (see below)
-3. Set your email in `traefik.yml`
+3. Set `ACME_EMAIL` to a real, reachable address (Let's Encrypt rejects example.com)
 
 **Generate password hash:**
+
 ```bash
 # Option 1: Using the script
 ./deploy.sh password
@@ -54,19 +60,15 @@ echo $(htpasswd -nb admin yourpassword) | sed -e s/\\$/\\$\\$/g
 
 Copy the output and paste it as `TRAEFIK_DASHBOARD_AUTH` in `.env`.
 
-### 4. Update Email in traefik.yml
+### 4. Configure server-specific services
 
-```bash
-nano traefik.yml
-```
+Edit `config/services.yml` to add any host services (systemd apps, legacy
+apps) that this server should proxy. If all your services run as Docker
+containers with Traefik labels, leave the file with empty routers/services.
 
-Find and update:
-```yaml
-certificatesResolvers:
-  letsencrypt:
-    acme:
-      email: your-email@example.com  # <-- Change this
-```
+> **Important:** Add only the services that belong to **this** server.
+> Entries for the wrong domain will trigger failing ACME challenges and
+> consume Let's Encrypt rate-limit quota.
 
 ### 5. Start Traefik
 
@@ -75,6 +77,7 @@ certificatesResolvers:
 ```
 
 Or manually:
+
 ```bash
 docker compose up -d
 ```
@@ -82,16 +85,19 @@ docker compose up -d
 ### 6. Verify Installation
 
 Check status:
+
 ```bash
 docker compose ps
 ```
 
 View logs:
+
 ```bash
 docker compose logs -f
 ```
 
 Access dashboard:
+
 ```
 https://your-traefik-domain.com
 ```
@@ -101,7 +107,7 @@ https://your-traefik-domain.com
 Create a `docker-compose.yml` for your app:
 
 ```yaml
-version: '3.8'
+version: "3.8"
 
 services:
   myapp:
@@ -122,11 +128,13 @@ networks:
 ```
 
 Start your app:
+
 ```bash
 docker compose up -d
 ```
 
 Traefik will automatically:
+
 - Detect your service
 - Route traffic to it
 - Generate SSL certificate
@@ -135,16 +143,19 @@ Traefik will automatically:
 ## Troubleshooting
 
 ### Can't access dashboard?
+
 - Check DNS: `nslookup your-traefik-domain.com`
 - Check firewall: `sudo ufw status`
 - Check logs: `docker compose logs traefik`
 
 ### Certificate not issued?
+
 - Wait 1-2 minutes for Let's Encrypt
 - Check logs: `docker compose logs traefik | grep acme`
 - Verify ports 80/443 are accessible from internet
 
 ### Service not routing?
+
 ```bash
 # Check if Traefik sees your service
 docker network inspect traefik_proxy
@@ -182,6 +193,7 @@ docker compose exec traefik traefik version
 ## Support
 
 Need help? Check:
+
 - Full README: `README.md`
 - Traefik docs: https://doc.traefik.io/
 - Your logs: `docker compose logs -f`

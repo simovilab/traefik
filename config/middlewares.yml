@@ -23,6 +23,7 @@ http:
         customResponseHeaders:
           X-Robots-Tag: "none,noarchive,nosnippet,notranslate,noimageindex"
           Server: ""
+          Content-Security-Policy: "default-src 'none'; frame-ancestors 'none'"
 
     # Rate Limiting
     rate-limit:
@@ -35,26 +36,34 @@ http:
     compression:
       compress: true
 
-    # IP Allow List Example (v3: ipAllowList; v2 ipWhiteList is deprecated)
-    # ip-allowlist:
-    #   ipAllowList:
-    #     sourceRange:
-    #       - "127.0.0.1/32"
-    #       - "192.168.1.0/24"
+    # IP Allow List — restrict dashboard access to trusted management CIDRs.
+    # Replace the ranges below with your actual management IP(s) / VPN CIDR.
+    ip-allowlist:
+      ipAllowList:
+        sourceRange:
+          - "127.0.0.1/32"
+          - "10.0.0.0/8"
+          - "172.16.0.0/12"
+          - "192.168.0.0/16"
 
-    # CORS Headers Example
-    # cors-headers:
-    #   headers:
-    #     accessControlAllowMethods:
-    #       - GET
-    #       - OPTIONS
-    #       - PUT
-    #       - POST
-    #       - DELETE
-    #     accessControlAllowOriginList:
-    #       - https://example.com
-    #     accessControlMaxAge: 100
-    #     addVaryHeader: true
+    # CORS Headers — configured for a public data-bus API.
+    # Restrict accessControlAllowOriginList to specific domains if this
+    # service is not meant to be fully public.
+    cors-headers:
+      headers:
+        accessControlAllowMethods:
+          - GET
+          - HEAD
+          - OPTIONS
+          - POST
+        accessControlAllowOriginList:
+          - "*"
+        accessControlAllowHeaders:
+          - "Accept"
+          - "Content-Type"
+          - "Authorization"
+        accessControlMaxAge: 86400
+        addVaryHeader: true
 
     # Redirect to WWW
     # redirect-to-www:
