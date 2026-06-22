@@ -12,9 +12,11 @@
 #   HTTP-01 challenges and consume Let's Encrypt rate-limit quota.
 ################################################################
 
-http:
-  routers: {}
-  services: {}
+# No file-provider (non-Docker) services run on this server yet, so this file
+# intentionally declares no active `http` section. An empty `http: { routers: {},
+# services: {} }` block here makes Traefik's directory provider reject the file
+# ("routers cannot be a standalone element"), which disables ALL file middlewares.
+# When adding a host-based service, uncomment a single `http:` tree like below.
 
   # Uncomment and adapt the block below for each host service on this server.
   # routers:
