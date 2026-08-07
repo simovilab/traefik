@@ -119,6 +119,10 @@ ensure_docker_access() {
         exit 1
     fi
     print_success "Added '$USER' to the 'docker' group (persists across reboots)"
+    print_warning "Terminals opened before now still carry the old group list"
+    print_info "  Group membership is only applied to new sessions, so this deploy"
+    print_info "  will continue in a subshell but your other shells are unaffected."
+    print_info "  To use docker there: run 'newgrp docker', or log out and back in."
 
     rerun_with_docker_group
 }
