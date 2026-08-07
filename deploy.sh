@@ -36,6 +36,93 @@ print_info() {
     echo -e "${BLUE}ℹ${NC} $1"
 }
 
+# Original invocation, captured in main() so we can re-exec ourselves.
+SCRIPT_ARGS=()
+# Cache so we only probe the daemon once per run.
+DOCKER_ACCESS_OK=false
+
+# Re-exec this script with the 'docker' group active in the new process.
+# Needed because group membership is only picked up by *new* sessions.
+rerun_with_docker_group() {
+    if ! command -v sg &> /dev/null; then
+        print_warning "'sg' not available. Log out and back in, then re-run: $0"
+        exit 1
+    fi
+
+    local cmd
+    cmd=$(printf '%q ' "$(readlink -f "$0")" "${SCRIPT_ARGS[@]}")
+    print_info "Re-running with the 'docker' group active..."
+    exec sg docker -c "$cmd"
+}
+
+# Make sure we can actually talk to the Docker daemon, offering to add the
+# current user to the 'docker' group if that is what is missing.
+ensure_docker_access() {
+    if [ "$DOCKER_ACCESS_OK" = true ]; then
+        return 0
+    fi
+
+    if docker info &> /dev/null; then
+        DOCKER_ACCESS_OK=true
+        return 0
+    fi
+
+    # Root always has socket access, so a failure here is a daemon problem.
+    if [ "$EUID" -eq 0 ]; then
+        print_error "Cannot reach the Docker daemon even as root"
+        print_info "  Start it with: systemctl start docker"
+        exit 1
+    fi
+
+    if [ ! -S /var/run/docker.sock ]; then
+        print_error "/var/run/docker.sock not found — is the Docker daemon running?"
+        print_info "  Start it with: sudo systemctl start docker"
+        exit 1
+    fi
+
+    print_warning "User '$USER' cannot access /var/run/docker.sock"
+
+    # Already a member? Then this shell simply predates the group change.
+    if id -nG "$USER" | tr ' ' '\n' | grep -qx docker; then
+        print_info "You are already in the 'docker' group, but this shell has a stale group list"
+        rerun_with_docker_group
+    fi
+
+    if ! getent group docker &> /dev/null; then
+        print_error "No 'docker' group exists on this system"
+        print_info "  Reinstall Docker or create it: sudo groupadd docker"
+        exit 1
+    fi
+
+    if ! command -v sudo &> /dev/null; then
+        print_error "sudo not available; cannot add '$USER' to the 'docker' group"
+        print_info "  Ask an admin to run: usermod -aG docker $USER"
+        exit 1
+    fi
+
+    print_warning "Members of the 'docker' group have root-equivalent access to this host"
+    if [ "${AUTO_DOCKER_GROUP:-}" = "1" ]; then
+        REPLY="y"
+    else
+        read -p "Add '$USER' to the 'docker' group now? (y/N): " -n 1 -r
+        echo
+    fi
+
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        print_error "Docker access required. Re-run with sudo, or add yourself manually:"
+        print_info "  sudo usermod -aG docker $USER && newgrp docker"
+        exit 1
+    fi
+
+    if ! sudo usermod -aG docker "$USER"; then
+        print_error "Failed to add '$USER' to the 'docker' group"
+        exit 1
+    fi
+    print_success "Added '$USER' to the 'docker' group (persists across reboots)"
+
+    rerun_with_docker_group
+}
+
 # Check prerequisites
 check_prerequisites() {
     print_header "Checking Prerequisites"
@@ -62,6 +149,10 @@ check_prerequisites() {
     if [ "$EUID" -eq 0 ]; then 
         print_warning "Running as root. Consider using a non-root user."
     fi
+
+    # Check we can actually use the daemon (not just that the CLI exists)
+    ensure_docker_access
+    print_success "Docker daemon is reachable"
 }
 
 # Create network
@@ -290,25 +381,30 @@ handle_choice() {
             print_info "Setup complete. Configure .env and run option 3 to start"
             ;;
         3)
+            ensure_docker_access
             validate_config
             start_traefik
             show_status
             ;;
         4)
+            ensure_docker_access
             docker compose down
             print_success "Traefik stopped"
             ;;
         5)
+            ensure_docker_access
             docker compose restart
             print_success "Traefik restarted"
             ;;
         6)
+            ensure_docker_access
             docker compose logs -f
             ;;
         7)
             generate_password
             ;;
         8)
+            ensure_docker_access
             docker compose ps
             ;;
         9)
@@ -322,6 +418,9 @@ handle_choice() {
 
 # Main script
 main() {
+    # Remembered so ensure_docker_access() can re-exec us verbatim
+    SCRIPT_ARGS=("$@")
+
     # If arguments provided, run directly
     if [ $# -gt 0 ]; then
         case "$1" in
